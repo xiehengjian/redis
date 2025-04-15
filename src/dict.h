@@ -94,9 +94,9 @@ typedef struct dictType {
 #define DICTHT_SIZE_MASK(exp) ((exp) == -1 ? 0 : (DICTHT_SIZE(exp))-1)
 
 struct dict {
-    dictType *type;
+    dictType *type; // 指向字典类型的指针，定义了字典的各种操作函数
 
-    dictEntry **ht_table[2];
+    dictEntry **ht_table[2]; // hash表数组
     unsigned long ht_used[2];
 
     long rehashidx; /* rehashing not in progress if rehashidx == -1 */

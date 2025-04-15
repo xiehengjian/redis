@@ -74,19 +74,20 @@ typedef struct aeFiredEvent {
     int mask;
 } aeFiredEvent;
 
-/* State of an event based program */
+/* 事件驱动程序的状态结构 
+ * State of an event based program */
 typedef struct aeEventLoop {
-    int maxfd;   /* highest file descriptor currently registered */
-    int setsize; /* max number of file descriptors tracked */
-    long long timeEventNextId;
-    aeFileEvent *events; /* Registered events */
-    aeFiredEvent *fired; /* Fired events */
-    aeTimeEvent *timeEventHead;
-    int stop;
-    void *apidata; /* This is used for polling API specific data */
-    aeBeforeSleepProc *beforesleep;
-    aeBeforeSleepProc *aftersleep;
-    int flags;
+    int maxfd;   /* 当前注册的最大文件描述符，如果为-1，则说明没有任何文件描述符被注册*/
+    int setsize; /* 跟踪的文件描述符的最大数量 */
+    long long timeEventNextId;  /* 下一个时间事件的ID */               
+    aeFileEvent *events;    /* 已注册的事件列表*/               
+    aeFiredEvent *fired;    /* 已触发的事件列表*/                     
+    aeTimeEvent *timeEventHead; /* 时间事件链表头 */                          
+    int stop;               /* 事件循环停止标志*/                        
+    void *apidata;         /* 用于特定轮询API的数据 */             
+    aeBeforeSleepProc *beforesleep;  /* 事件循环睡眠前的回调函数 */                          
+    aeBeforeSleepProc *aftersleep;   /* 事件循环睡眠后的回调函数 */                           
+    int flags;             /* 事件循环标志*/
 } aeEventLoop;
 
 /* Prototypes */

@@ -962,23 +962,21 @@ typedef struct replBufBlock {
     char buf[];
 } replBufBlock;
 
-/* Redis database representation. There are multiple databases identified
- * by integers from 0 (the default database) up to the max configured
- * database. The database number is the 'id' field in the structure. */
+/* Redis数据库表示。有多个数据库,通过从0(默认数据库)到最大配置数据库的整数标识。
+ * 数据库编号存储在结构体的'id'字段中。 */
 typedef struct redisDb {
-    kvstore *keys;              /* The keyspace for this DB */
-    kvstore *expires;           /* Timeout of keys with a timeout set */
-    ebuckets hexpires;          /* Hash expiration DS. Single TTL per hash (of next min field to expire) */
-    dict *blocking_keys;        /* Keys with clients waiting for data (BLPOP)*/
-    dict *blocking_keys_unblock_on_nokey;   /* Keys with clients waiting for
-                                             * data, and should be unblocked if key is deleted (XREADEDGROUP).
-                                             * This is a subset of blocking_keys*/
-    dict *ready_keys;           /* Blocked keys that received a PUSH */
-    dict *watched_keys;         /* WATCHED keys for MULTI/EXEC CAS */
-    int id;                     /* Database ID */
-    long long avg_ttl;          /* Average TTL, just for stats */
-    unsigned long expires_cursor; /* Cursor of the active expire cycle. */
-    list *defrag_later;         /* List of key names to attempt to defrag one by one, gradually. */
+    kvstore *keys;              /* 该数据库的键空间 */
+    kvstore *expires;           /* 设置了过期时间的键的超时信息 */
+    ebuckets hexpires;          /* 哈希过期数据结构。每个哈希只有一个TTL(下一个最小过期字段) */
+    dict *blocking_keys;        /* 有客户端等待数据的键(BLPOP) */
+    dict *blocking_keys_unblock_on_nokey;   /* 有客户端等待数据的键,当键被删除时应该解除阻塞
+                                             * (XREADEDGROUP)。这是blocking_keys的子集 */
+    dict *ready_keys;           /* 收到PUSH的被阻塞键 */
+    dict *watched_keys;         /* MULTI/EXEC CAS中被监视的键 */
+    int id;                     /* 数据库ID */
+    long long avg_ttl;          /* 平均TTL,仅用于统计 */
+    unsigned long expires_cursor; /* 主动过期循环的游标 */
+    list *defrag_later;         /* 待逐个尝试碎片整理的键名列表 */
 } redisDb;
 
 /* forward declaration for functions ctx */
@@ -2340,10 +2338,14 @@ typedef int redisGetKeysProc(struct redisCommand *cmd, robj **argv, int argc, ge
  */
 struct redisCommand {
     /* Declarative data */
+    // 命令的名称，比如get，set，del等
     const char *declared_name; /* A string representing the command declared_name.
                                 * It is a const char * for native commands and SDS for module commands. */
+    // 命令的描述，比如对于del来说，就是Deletes one or more keys
     const char *summary; /* Summary of the command (optional). */
+    // 命令的复杂度说明，比如del就是O(N)
     const char *complexity; /* Complexity description (optional). */
+    // 从什么版本开始可用
     const char *since; /* Debut version of the command (optional). */
     int doc_flags; /* Flags for documentation (see CMD_DOC_*). */
     const char *replaced_by; /* In case the command is deprecated, this is the successor command. */

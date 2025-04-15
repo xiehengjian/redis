@@ -240,6 +240,8 @@
 /* The size of a ziplist header: two 32 bit integers for the total
  * bytes count and last item offset. One 16 bit integer for the number
  * of items field. */
+// 两个32位整数
+// 1个16位整数
 #define ZIPLIST_HEADER_SIZE     (sizeof(uint32_t)*2+sizeof(uint16_t))
 
 /* Size of the "end of ziplist" entry. Just one byte. */
@@ -366,19 +368,23 @@ static inline unsigned int zipIntSize(unsigned char encoding) {
  * The function returns the number of bytes used by the encoding/length
  * header stored in 'p'. */
 unsigned int zipStoreEntryEncoding(unsigned char *p, unsigned char encoding, unsigned int rawlen) {
+// 默认编码结果是1字节
     unsigned char len = 1, buf[5];
-
+// 如果是字符串数据
     if (ZIP_IS_STR(encoding)) {
         /* Although encoding is given it may not be set for strings,
          * so we determine it here using the raw length. */
+        // 字符串疮毒小于等于63字节(16进制为0x3f),默认编码结果是1字节
         if (rawlen <= 0x3f) {
             if (!p) return len;
             buf[0] = ZIP_STR_06B | rawlen;
+            // 字符串长度小于16383字节，编码结果是2字节
         } else if (rawlen <= 0x3fff) {
             len += 1;
             if (!p) return len;
             buf[0] = ZIP_STR_14B | ((rawlen >> 8) & 0x3f);
             buf[1] = rawlen & 0xff;
+            // 字符串长度大于16383字节，编码结果是5字节
         } else {
             len += 4;
             if (!p) return len;
@@ -389,6 +395,7 @@ unsigned int zipStoreEntryEncoding(unsigned char *p, unsigned char encoding, uns
             buf[4] = rawlen & 0xff;
         }
     } else {
+        // 如果数据是整数，编码结果是1字节
         /* Implies integer encoding, so length is always 1. */
         if (!p) return len;
         buf[0] = encoding;
@@ -440,6 +447,9 @@ unsigned int zipStoreEntryEncoding(unsigned char *p, unsigned char encoding, uns
 
 /* Encode the length of the previous entry and write it to "p". This only
  * uses the larger encoding (required in __ziplistCascadeUpdate). */
+// 先将prevlen的第1字节设置为254，
+// 然后通过memcpy将前一列表项的长度值拷贝至prvlen的第2至第5字节。
+// 所以prevlen的长度是1字节或5字节
 int zipStorePrevEntryLengthLarge(unsigned char *p, unsigned int len) {
     uint32_t u32;
     if (p != NULL) {
@@ -453,6 +463,8 @@ int zipStorePrevEntryLengthLarge(unsigned char *p, unsigned int len) {
 
 /* Encode the length of the previous entry and write it to "p". Return the
  * number of bytes needed to encode this length if "p" is NULL. */
+// 判断前一个列表项是否小于254字节，如果是的话那么prevlen就用1字节就足够了。
+// 否则则调用zipStorePrevEntryLengthLarge进一步判断
 unsigned int zipStorePrevEntryLength(unsigned char *p, unsigned int len) {
     if (p == NULL) {
         return (len < ZIP_BIG_PREVLEN) ? 1 : sizeof(uint32_t) + 1;
@@ -707,13 +719,16 @@ static inline void zipAssertValidEntry(unsigned char* zl, size_t zlbytes, unsign
     assert(zipEntrySafe(zl, zlbytes, p, &e, 1));
 }
 
-/* Create a new empty ziplist. */
+/* Create a new empty ziplist. */ //创建一个空的ziplist
+// 核心逻辑就是直接创建一块连续的内存空间，大小为header和end的总和，并且最后一个字节设置为end。
 unsigned char *ziplistNew(void) {
+    // 初始分配的大小
     unsigned int bytes = ZIPLIST_HEADER_SIZE+ZIPLIST_END_SIZE;
     unsigned char *zl = zmalloc(bytes);
     ZIPLIST_BYTES(zl) = intrev32ifbe(bytes);
     ZIPLIST_TAIL_OFFSET(zl) = intrev32ifbe(ZIPLIST_HEADER_SIZE);
     ZIPLIST_LENGTH(zl) = 0;
+    // 设置结束符
     zl[bytes-1] = ZIP_END;
     return zl;
 }

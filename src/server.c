@@ -3182,7 +3182,7 @@ struct redisCommand *lookupSubcommand(struct redisCommand *container, sds sub_na
  * a user requested to execute (in processCommand).
  */
 struct redisCommand *lookupCommandLogic(dict *commands, robj **argv, int argc, int strict) {
-    struct redisCommand *base_cmd = dictFetchValue(commands, argv[0]->ptr);
+    struct redisCommand *base_cmd = dictFetchValue(commands, argv[0]->ptr);//转成redis对应的command
     int has_subcommands = base_cmd && base_cmd->subcommands_dict;
     if (argc == 1 || !has_subcommands) {
         if (strict && argc != 1)
@@ -3521,7 +3521,7 @@ int incrCommandStatsOnError(struct redisCommand *cmd, int flags) {
  * preventCommandReplication(client *c);
  *
  */
-void call(client *c, int flags) {
+void call(client *c, int flags) {//看起来是用来分发命令的
     long long dirty;
     uint64_t client_old_flags = c->flags;
     struct redisCommand *real_cmd = c->realcmd;
@@ -3873,42 +3873,39 @@ uint64_t getCommandFlags(client *c) {
     return cmd_flags;
 }
 
-/* If this function gets called we already read a whole
- * command, arguments are in the client argv/argc fields.
- * processCommand() execute the command or prepare the
- * server for a bulk read from the client.
+/* 当这个函数被调用时,我们已经读取了一个完整的命令,
+ * 参数存储在客户端的 argv/argc 字段中。
+ * processCommand() 执行命令或为从客户端批量读取做准备。
  *
- * If C_OK is returned the client is still alive and valid and
- * other operations can be performed by the caller. Otherwise
- * if C_ERR is returned the client was destroyed (i.e. after QUIT). */
+ * 如果返回 C_OK,说明客户端仍然存活且有效,
+ * 调用者可以执行其他操作。
+ * 如果返回 C_ERR,说明客户端已被销毁(例如执行 QUIT 命令后)。 */
 int processCommand(client *c) {
     if (!scriptIsTimedout()) {
-        /* Both EXEC and scripts call call() directly so there should be
-         * no way in_exec or scriptIsRunning() is 1.
-         * That is unless lua_timedout, in which case client may run
-         * some commands. */
+        /* EXEC和脚本都直接调用call(),所以in_exec和scriptIsRunning()不应该为1。
+         * 除非lua_timedout,这种情况下客户端可能会运行一些命令。 */
         serverAssert(!server.in_exec);
         serverAssert(!scriptIsRunning());
     }
 
-    /* in case we are starting to ProcessCommand and we already have a command we assume
-     * this is a reprocessing of this command, so we do not want to perform some of the actions again. */
+    /* 如果我们开始处理命令时已经有一个命令,我们假设这是对该命令的重新处理,
+     * 所以我们不想再次执行某些操作。 */
     int client_reprocessing_command = c->cmd ? 1 : 0;
 
-    /* only run command filter if not reprocessing command */
+    /* 只在不重新处理命令时运行命令过滤器 */
     if (!client_reprocessing_command) {
         moduleCallCommandFilters(c);
         reqresAppendRequest(c);
     }
 
-    /* Handle possible security attacks. */
+    /* 处理可能的安全攻击 */
     if (!strcasecmp(c->argv[0]->ptr,"host:") || !strcasecmp(c->argv[0]->ptr,"post")) {
         securityWarningCommand(c);
         return C_ERR;
     }
 
-    /* If we're inside a module blocked context yielding that wants to avoid
-     * processing clients, postpone the command. */
+    /* 如果我们在一个想要避免处理客户端的模块阻塞上下文中,
+     * 推迟命令的执行 */
     if (server.busy_module_yield_flags != BUSY_MODULE_YIELD_NONE &&
         !(server.busy_module_yield_flags & BUSY_MODULE_YIELD_CLIENTS))
     {
@@ -3916,12 +3913,12 @@ int processCommand(client *c) {
         return C_OK;
     }
 
-    /* Now lookup the command and check ASAP about trivial error conditions
-     * such as wrong arity, bad command name and so forth.
-     * In case we are reprocessing a command after it was blocked,
-     * we do not have to repeat the same checks */
+    /* 现在查找命令并尽快检查简单的错误条件,
+     * 比如错误的参数数量、错误的命令名等。
+     * 如果我们在命令被阻塞后重新处理它,
+     * 我们不需要重复相同的检查 */
     if (!client_reprocessing_command) {
-        c->cmd = c->lastcmd = c->realcmd = lookupCommand(c->argv,c->argc);
+        c->cmd = c->lastcmd = c->realcmd = lookupCommand(c->argv,c->argc);//找到需要调用的cmd
         sds err;
         if (!commandCheckExistence(c, &err)) {
             rejectCommandSds(c, err);
@@ -3933,7 +3930,7 @@ int processCommand(client *c) {
         }
 
 
-        /* Check if the command is marked as protected and the relevant configuration allows it */
+        /* 检查命令是否被标记为受保护的,以及相关配置是否允许它 */
         if (c->cmd->flags & CMD_PROTECTED) {
             if ((c->cmd->proc == debugCommand && !allowProtectedAction(server.enable_debug_cmd, c)) ||
                 (c->cmd->proc == moduleCommand && !allowProtectedAction(server.enable_module_cmd, c)))
@@ -3968,8 +3965,7 @@ int processCommand(client *c) {
     int obey_client = mustObeyClient(c);
 
     if (authRequired(c)) {
-        /* AUTH and HELLO and no auth commands are valid even in
-         * non-authenticated state. */
+        /* AUTH和HELLO以及无需认证的命令在未认证状态下也是有效的 */
         if (!(c->cmd->flags & CMD_NO_AUTH)) {
             rejectCommand(c,shared.noautherr);
             return C_OK;
@@ -3981,8 +3977,7 @@ int processCommand(client *c) {
         return C_OK;
     }
 
-    /* Check if the user can run this command according to the current
-     * ACLs. */
+    /* 根据当前的ACL检查用户是否可以运行此命令 */
     int acl_errpos;
     int acl_retval = ACLCheckAllPerm(c,&acl_errpos);
     if (acl_retval != ACL_OK) {
@@ -3993,10 +3988,10 @@ int processCommand(client *c) {
         return C_OK;
     }
 
-    /* If cluster is enabled perform the cluster redirection here.
-     * However we don't perform the redirection if:
-     * 1) The sender of this command is our master.
-     * 2) The command has no key arguments. */
+    /* 如果集群已启用,在这里执行集群重定向。
+     * 但在以下情况下不执行重定向:
+     * 1) 命令的发送者是我们的主节点
+     * 2) 命令没有键参数 */
     if (server.cluster_enabled &&
         !mustObeyClient(c) &&
         !(!(c->cmd->flags&CMD_MOVABLE_KEYS) && c->cmd->key_specs_num == 0 &&
@@ -4018,32 +4013,29 @@ int processCommand(client *c) {
         }
     }
 
-    /* Disconnect some clients if total clients memory is too high. We do this
-     * before key eviction, after the last command was executed and consumed
-     * some client output buffer memory. */
+    /* 如果客户端总内存太高,断开一些客户端连接。
+     * 我们在键驱逐之前执行此操作,在最后一个命令执行并消耗了一些客户端输出缓冲区内存之后。 */
     evictClients();
     if (server.current_client == NULL) {
-        /* If we evicted ourself then abort processing the command */
+        /* 如果我们驱逐了自己,则中止处理命令 */
         return C_ERR;
     }
 
-    /* Handle the maxmemory directive.
+    /* 处理maxmemory指令。
      *
-     * Note that we do not want to reclaim memory if we are here re-entering
-     * the event loop since there is a busy Lua script running in timeout
-     * condition, to avoid mixing the propagation of scripts with the
-     * propagation of DELs due to eviction. */
+     * 注意,如果我们在这里重新进入事件循环,我们不想回收内存,
+     * 因为有一个在超时条件下运行的繁忙Lua脚本,
+     * 以避免将脚本的传播与由于驱逐而导致的DEL传播混合在一起。 */
     if (server.maxmemory && !isInsideYieldingLongCommand()) {
-        int out_of_memory = (performEvictions() == EVICT_FAIL);
+        int out_of_memory = (performEvictions() == EVICT_FAIL);//看起来在redis7.4里，逐出的入口变成了performEvictions
 
-        /* performEvictions may evict keys, so we need flush pending tracking
-         * invalidation keys. If we don't do this, we may get an invalidation
-         * message after we perform operation on the key, where in fact this
-         * message belongs to the old value of the key before it gets evicted.*/
+        /* performEvictions可能会驱逐键,所以我们需要刷新待处理的跟踪失效键。
+         * 如果我们不这样做,我们可能会在对键执行操作后收到失效消息,
+         * 而实际上这个消息属于键被驱逐之前的旧值。*/
         trackingHandlePendingKeyInvalidations();
 
-        /* performEvictions may flush slave output buffers. This may result
-         * in a slave, that may be the active client, to be freed. */
+        /* performEvictions可能会刷新从节点输出缓冲区。
+         * 这可能导致一个从节点(可能是活动客户端)被释放。 */
         if (server.current_client == NULL) return C_ERR;
 
         if (out_of_memory && is_denyoom_command) {
@@ -4051,21 +4043,18 @@ int processCommand(client *c) {
             return C_OK;
         }
 
-        /* Save out_of_memory result at command start, otherwise if we check OOM
-         * in the first write within script, memory used by lua stack and
-         * arguments might interfere. We need to save it for EXEC and module
-         * calls too, since these can call EVAL, but avoid saving it during an
-         * interrupted / yielding busy script / module. */
+        /* 在命令开始时保存out_of_memory结果,否则如果我们在脚本中的第一次写入时检查OOM,
+         * lua栈和参数使用的内存可能会干扰。我们需要为EXEC和模块调用也保存它,
+         * 因为这些可以调用EVAL,但在中断/让出的繁忙脚本/模块期间避免保存它。 */
         server.pre_command_oom_state = out_of_memory;
     }
 
-    /* Make sure to use a reasonable amount of memory for client side
-     * caching metadata. */
+    /* 确保为客户端侧缓存元数据使用合理的内存量 */
     if (server.tracking_clients) trackingLimitUsedSlots();
 
-    /* Don't accept write commands if there are problems persisting on disk
-     * unless coming from our master, in which case check the replica ignore
-     * disk write error config to either log or crash. */
+    /* 如果磁盘持久化出现问题,不接受写命令,
+     * 除非来自我们的主节点,在这种情况下检查从节点忽略磁盘写入错误配置,
+     * 以决定是记录日志还是崩溃。 */
     int deny_write_type = writeCommandsDeniedByDiskError();
     if (deny_write_type != DISK_ERROR_TYPE_NONE &&
         (is_write_command || c->cmd->proc == pingCommand))
@@ -4084,22 +4073,22 @@ int processCommand(client *c) {
             }
         } else {
             sds err = writeCommandsGetDiskErrorMessage(deny_write_type);
-            /* remove the newline since rejectCommandSds adds it. */
+            /* 移除换行符,因为rejectCommandSds会添加它 */
             sdssubstr(err, 0, sdslen(err)-2);
             rejectCommandSds(c, err);
             return C_OK;
         }
     }
 
-    /* Don't accept write commands if there are not enough good slaves and
-     * user configured the min-slaves-to-write option. */
+    /* 如果没有足够的好的从节点且用户配置了min-slaves-to-write选项,
+     * 不接受写命令 */
     if (is_write_command && !checkGoodReplicasStatus()) {
         rejectCommand(c, shared.noreplicaserr);
         return C_OK;
     }
 
-    /* Don't accept write commands if this is a read only slave. But
-     * accept write commands if this is our master. */
+    /* 如果这是一个只读从节点,不接受写命令。
+     * 但如果这是我们的主节点,则接受写命令。 */
     if (server.masterhost && server.repl_slave_ro &&
         !obey_client &&
         is_write_command)
@@ -4108,8 +4097,8 @@ int processCommand(client *c) {
         return C_OK;
     }
 
-    /* Only allow a subset of commands in the context of Pub/Sub if the
-     * connection is in RESP2 mode. With RESP3 there are no limits. */
+    /* 如果连接处于RESP2模式,在Pub/Sub上下文中只允许一部分命令。
+     * 使用RESP3时没有限制。 */
     if ((c->flags & CLIENT_PUBSUB && c->resp == 2) &&
         c->cmd->proc != pingCommand &&
         c->cmd->proc != subscribeCommand &&
@@ -4127,9 +4116,8 @@ int processCommand(client *c) {
         return C_OK;
     }
 
-    /* Only allow commands with flag "t", such as INFO, REPLICAOF and so on,
-     * when replica-serve-stale-data is no and we are a replica with a broken
-     * link with master. */
+    /* 当replica-serve-stale-data为否且我们是一个与主节点连接断开的从节点时,
+     * 只允许带有"t"标志的命令,如INFO、REPLICAOF等 */
     if (server.masterhost && server.repl_state != REPL_STATE_CONNECTED &&
         server.repl_serve_stale_data == 0 &&
         is_denystale_command)
@@ -4138,26 +4126,25 @@ int processCommand(client *c) {
         return C_OK;
     }
 
-    /* Loading DB? Return an error if the command has not the
-     * CMD_LOADING flag. */
+    /* 正在加载数据库?如果命令没有CMD_LOADING标志,返回错误 */
     if (server.loading && !server.async_loading && is_denyloading_command) {
         rejectCommand(c, shared.loadingerr);
         return C_OK;
     }
 
-    /* During async-loading, block certain commands. */
+    /* 在异步加载期间,阻止某些命令 */
     if (server.async_loading && is_deny_async_loading_command) {
         rejectCommand(c,shared.loadingerr);
         return C_OK;
     }
 
-    /* when a busy job is being done (script / module)
-     * Only allow a limited number of commands.
-     * Note that we need to allow the transactions commands, otherwise clients
-     * sending a transaction with pipelining without error checking, may have
-     * the MULTI plus a few initial commands refused, then the timeout
-     * condition resolves, and the bottom-half of the transaction gets
-     * executed, see Github PR #7022. */
+    /* 当正在执行繁忙任务(脚本/模块)时,
+     * 只允许有限数量的命令。
+     * 注意我们需要允许事务命令,否则客户端
+     * 在使用流水线发送事务而不进行错误检查时,
+     * 可能会有MULTI加上几个初始命令被拒绝,
+     * 然后超时条件解决,事务的下半部分得到执行,
+     * 参见Github PR #7022。 */
     if (isInsideYieldingLongCommand() && !(c->cmd->flags & CMD_ALLOW_BUSY)) {
         if (server.busy_module_yield_flags && server.busy_module_yield_reply) {
             rejectCommandFormat(c, "-BUSY %s", server.busy_module_yield_reply);
@@ -4171,16 +4158,16 @@ int processCommand(client *c) {
         return C_OK;
     }
 
-    /* Prevent a replica from sending commands that access the keyspace.
-     * The main objective here is to prevent abuse of client pause check
-     * from which replicas are exempt. */
+    /* 防止从节点发送访问键空间的命令。
+     * 这里的主要目的是防止滥用客户端暂停检查,
+     * 从节点是免除这个检查的。 */
     if ((c->flags & CLIENT_SLAVE) && (is_may_replicate_command || is_write_command || is_read_command)) {
         rejectCommandFormat(c, "Replica can't interact with the keyspace");
         return C_OK;
     }
 
-    /* If the server is paused, block the client until
-     * the pause has ended. Replicas are never paused. */
+    /* 如果服务器已暂停,阻塞客户端直到暂停结束。
+     * 从节点永远不会被暂停。 */
     if (!(c->flags & CLIENT_SLAVE) && 
         ((isPausedActions(PAUSE_ACTION_CLIENT_ALL)) ||
         ((isPausedActions(PAUSE_ACTION_CLIENT_WRITE)) && is_may_replicate_command)))
@@ -4189,7 +4176,7 @@ int processCommand(client *c) {
         return C_OK;       
     }
 
-    /* Exec the command */
+    /* 执行命令 */
     if (c->flags & CLIENT_MULTI &&
         c->cmd->proc != execCommand &&
         c->cmd->proc != discardCommand &&
@@ -6709,6 +6696,7 @@ void loadDataFromDisk(void) {
     }
 }
 
+// 当OOM发生时，打一些log
 void redisOutOfMemoryHandler(size_t allocation_size) {
     serverLog(LL_WARNING,"Out Of Memory allocating %zu bytes!",
         allocation_size);
@@ -6915,10 +6903,16 @@ redisTestProc *getTestProcByName(const char *name) {
 #endif
 
 int main(int argc, char **argv) {
+    // 声明一个timeval结构体变量tv
     struct timeval tv;
     int j;
     char config_from_stdin = 0;
 
+    /*
+     #ifdef是C语言的预处理指令，用于条件编译，如果定义了REDIS_TEST宏，则编译并且会执行下面的代码
+     否则在正式编译的时候就会去除。
+     这样的好处是将测试代码和核心逻辑进行了物理隔离
+    */
 #ifdef REDIS_TEST
     monotonicInit(); /* Required for dict tests, that are relying on monotime during dict rehashing. */
     if (argc >= 3 && !strcasecmp(argv[1], "test")) {
@@ -6963,14 +6957,26 @@ int main(int argc, char **argv) {
 #endif
 
     /* We need to initialize our libraries, and the server configuration. */
+    /*看起来这里是用于进程标题的初始化处理的跨平台兼容
+    所谓进程标题，就是在TOP命令下看到的进程的name
+    不过我尝试注释这里，用top看到的还是redis-server，anyway，先不管它
+    */
 #ifdef INIT_SETPROCTITLE_REPLACEMENT
     spt_init(argc, argv);
 #endif
+    //看起来是设置时区？
     tzset(); /* Populates 'timezone' global. */
+   // 设置当oom发生的时候的处理函数，看起来就是打log
     zmalloc_set_oom_handler(redisOutOfMemoryHandler);
 
     /* To achieve entropy, in case of containers, their time() and getpid() can
      * be the same. But value of tv_usec is fast enough to make the difference */
+    /*
+    这里是设置随机数种子，在伪随机生成器中，如果种子一样的话，那生成的随机数序列是一样的。 
+    因此一般为了更加随机，就需要合理选择随机数种子，一般当前时间相关的，就可以实现不一样的种子 
+
+    */
+
     gettimeofday(&tv,NULL);
     srand(time(NULL)^getpid()^tv.tv_usec);
     srandom(time(NULL)^getpid()^tv.tv_usec);
@@ -7019,6 +7025,7 @@ int main(int argc, char **argv) {
     else if (strstr(exec_name,"redis-check-aof") != NULL)
         redis_check_aof_main(argc,argv);
 
+        // 这里处理启动server时传入的一些参数
     if (argc >= 2) {
         j = 1; /* First option to parse in argv[] */
         sds options = sdsempty();

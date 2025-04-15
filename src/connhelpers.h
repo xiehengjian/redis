@@ -49,9 +49,9 @@ static inline int connHasRefs(connection *conn) {
 }
 
 /* Helper for connection implementations to call handlers:
- * 1. Increment refs to protect the connection.
- * 2. Execute the handler (if set).
- * 3. Decrement refs and perform deferred close, if refs==0.
+ * 1. Increment refs to protect the connection. 增加引用以保护连接。
+ * 2. Execute the handler (if set). 执行处理程序（如果已设置）。
+ * 3. Decrement refs and perform deferred close, if refs==0. 如果refs==0，则减少引用并执行延迟关闭。
  */
 static inline int callHandler(connection *conn, ConnectionCallbackFunc handler) {
     connIncrRefs(conn);

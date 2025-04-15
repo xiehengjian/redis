@@ -2652,6 +2652,8 @@ int processInputBuffer(client *c) {
     return C_OK;
 }
 
+// 看起来这里应该是处理客户端请求的入口
+// client启动的时候，建立连接应该也会调用这里
 void readQueryFromClient(connection *conn) {
     client *c = connGetPrivateData(conn);
     int nread, big_arg = 0;

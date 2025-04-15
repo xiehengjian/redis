@@ -2476,7 +2476,7 @@ static int updateReplBacklogSize(const char **err) {
     resizeReplicationBacklog();
     return 1;
 }
-
+// 当maxmemory发生变化时，就会启动一个异步的逐出线程
 static int updateMaxmemory(const char **err) {
     UNUSED(err);
     if (server.maxmemory) {

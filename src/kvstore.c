@@ -28,20 +28,20 @@
 #define UNUSED(V) ((void) V)
 
 struct _kvstore {
-    int flags;
-    dictType dtype;
-    dict **dicts;
-    long long num_dicts;
-    long long num_dicts_bits;
-    list *rehashing;                       /* List of dictionaries in this kvstore that are currently rehashing. */
-    int resize_cursor;                     /* Cron job uses this cursor to gradually resize dictionaries (only used if num_dicts > 1). */
-    int allocated_dicts;                   /* The number of allocated dicts. */
-    int non_empty_dicts;                   /* The number of non-empty dicts. */
-    unsigned long long key_count;          /* Total number of keys in this kvstore. */
-    unsigned long long bucket_count;       /* Total number of buckets in this kvstore across dictionaries. */
-    unsigned long long *dict_size_index;   /* Binary indexed tree (BIT) that describes cumulative key frequencies up until given dict-index. */
-    size_t overhead_hashtable_lut;         /* The overhead of all dictionaries. */
-    size_t overhead_hashtable_rehashing;   /* The overhead of dictionaries rehashing. */
+    int flags;                            /* 配置标志位,用于控制kvstore的行为,如按需分配字典、释放空字典等 */
+    dictType dtype;                       /* 字典类型定义,包含哈希函数、键比较函数等 */
+    dict **dicts;                        /* 字典数组,每个元素是一个字典指针 */
+    long long num_dicts;                 /* 字典数组的大小(字典总数) */
+    long long num_dicts_bits;            /* 字典数组大小对应的位数,用于计算索引 */
+    list *rehashing;                     /* 当前正在进行rehash操作的字典列表 */
+    int resize_cursor;                   /* 定时任务使用的游标,用于逐步调整字典大小(仅当num_dicts > 1时使用) */
+    int allocated_dicts;                 /* 已分配的字典数量 */
+    int non_empty_dicts;                 /* 非空字典的数量 */
+    unsigned long long key_count;        /* kvstore中的键总数 */
+    unsigned long long bucket_count;     /* 所有字典中bucket的总数 */
+    unsigned long long *dict_size_index; /* 二叉索引树(BIT),记录到每个字典索引为止的累计键频率 */
+    size_t overhead_hashtable_lut;       /* 所有字典的内存开销 */
+    size_t overhead_hashtable_rehashing; /* 正在进行rehash的字典的内存开销 */
 };
 
 /* Structure for kvstore iterator that allows iterating across multiple dicts. */

@@ -381,7 +381,7 @@ int getMaxmemoryState(size_t *total, size_t *logical, size_t *tofree, float *lev
 
     /* Check if we are over the memory usage limit. If we are not, no need
      * to subtract the slaves output buffers. We can just return ASAP. */
-    mem_reported = zmalloc_used_memory();
+    mem_reported = zmalloc_used_memory();//获取使用的内存
     if (total) *total = mem_reported;
 
     /* We may return ASAP if there is no need to compute the level. */
@@ -400,7 +400,7 @@ int getMaxmemoryState(size_t *total, size_t *logical, size_t *tofree, float *lev
     /* Compute the ratio of memory usage. */
     if (level) *level = (float)mem_used / (float)server.maxmemory;
 
-    if (mem_reported <= server.maxmemory) return C_OK;
+    if (mem_reported <= server.maxmemory) return C_OK; //内存没有超限，直接返回
 
     /* Check if we are still over the memory limit. */
     if (mem_used <= server.maxmemory) return C_OK;
@@ -434,7 +434,7 @@ int overMaxmemoryAfterAlloc(size_t moremem) {
  * eviction cycles until the "maxmemory" condition has resolved or there are no
  * more evictable items.  */
 static int isEvictionProcRunning = 0;
-static int evictionTimeProc(
+static int evictionTimeProc( // 当内存超限并且无法立即解决时，就会启动一个事件循环来进行处理。
         struct aeEventLoop *eventLoop, long long id, void *clientData) {
     UNUSED(eventLoop);
     UNUSED(id);
@@ -452,7 +452,7 @@ void startEvictionTimeProc(void) {
     if (!isEvictionProcRunning) {
         isEvictionProcRunning = 1;
         aeCreateTimeEvent(server.el, 0,
-                evictionTimeProc, NULL, NULL);
+                evictionTimeProc, NULL, NULL); // 这里是唯一调用evictionTimeProc的地方
     }
 }
 
@@ -527,8 +527,8 @@ int performEvictions(void) {
     long long mem_freed; /* May be negative */
     mstime_t latency, eviction_latency;
     long long delta;
-    int slaves = listLength(server.slaves);
-    int result = EVICT_FAIL;
+    int slaves = listLength(server.slaves);//获取从库的数量
+    int result = EVICT_FAIL;//结果先声明称逐出失败
 
     if (getMaxmemoryState(&mem_reported,NULL,&mem_tofree,NULL) == C_OK) {
         result = EVICT_OK;
@@ -540,7 +540,7 @@ int performEvictions(void) {
         goto update_metrics;
     }
 
-    unsigned long eviction_time_limit_us = evictionTimeLimitUs();
+    unsigned long eviction_time_limit_us = evictionTimeLimitUs();//限制逐出的时间
 
     mem_freed = 0;
 
@@ -553,7 +553,7 @@ int performEvictions(void) {
     serverAssert(server.also_propagate.numops == 0);
     /* Evictions are performed on random keys that have nothing to do with the current command slot. */
 
-    while (mem_freed < (long long)mem_tofree) {
+    while (mem_freed < (long long)mem_tofree) {//判断释放的内存是否足够
         int j, k, i;
         static unsigned int next_db = 0;
         sds bestkey = NULL;
@@ -712,6 +712,7 @@ int performEvictions(void) {
                 /* After some time, exit the loop early - even if memory limit
                  * hasn't been reached.  If we suddenly need to free a lot of
                  * memory, don't want to spend too much time here.  */
+                // 在逐出逻辑本身如果已经超时的情况下，也会改成一个事件循环来异步进行逐出。
                 if (elapsedUs(evictionTimer) > eviction_time_limit_us) {
                     // We still need to free memory - start eviction timer proc
                     startEvictionTimeProc();

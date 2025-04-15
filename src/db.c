@@ -172,11 +172,10 @@ robj *lookupKeyWriteOrReply(client *c, robj *key, robj *reply) {
     return o;
 }
 
-/* Add the key to the DB. It's up to the caller to increment the reference
- * counter of the value if needed.
+/* 将键添加到数据库中。由调用者决定是否需要增加值的引用计数。
  *
- * If the update_if_existing argument is false, the program is aborted
- * if the key already exists, otherwise, it can fall back to dbOverwrite. */
+ * 如果 update_if_existing 参数为 false,当键已存在时程序会终止,
+ * 否则会回退到 dbOverwrite。 */
 static dictEntry *dbAddInternal(redisDb *db, robj *key, robj *val, int update_if_existing) {
     dictEntry *existing;
     int slot = getKeySlot(key->ptr);
@@ -294,19 +293,19 @@ void dbReplaceValue(redisDb *db, robj *key, robj *val) {
     dbSetValue(db, key, val, 0, NULL);
 }
 
-/* High level Set operation. This function can be used in order to set
- * a key, whatever it was existing or not, to a new object.
+/* 高级Set操作。这个函数可以用来设置一个键的值,
+ * 无论这个键是否已经存在。
  *
- * 1) The ref count of the value object is incremented.
- * 2) clients WATCHing for the destination key notified.
- * 3) The expire time of the key is reset (the key is made persistent),
- *    unless 'SETKEY_KEEPTTL' is enabled in flags.
- * 4) The key lookup can take place outside this interface outcome will be
- *    delivered with 'SETKEY_ALREADY_EXIST' or 'SETKEY_DOESNT_EXIST'
+ * 1) 值对象的引用计数会增加。
+ * 2) 监视目标键的客户端会收到通知。
+ * 3) 键的过期时间会被重置(键变为持久的),
+ *    除非在flags中启用了'SETKEY_KEEPTTL'。
+ * 4) 键的查找可以在这个接口之外进行,结果会通过
+ *    'SETKEY_ALREADY_EXIST'或'SETKEY_DOESNT_EXIST'传递。
  *
- * All the new keys in the database should be created via this interface.
- * The client 'c' argument may be set to NULL if the operation is performed
- * in a context where there is no clear client performing the operation. */
+ * 数据库中所有新键都应该通过这个接口创建。
+ * 如果在没有明确的客户端执行操作的上下文中执行操作,
+ * 客户端参数'c'可以设置为NULL。 */
 void setKey(client *c, redisDb *db, robj *key, robj *val, int flags) {
     int keyfound = 0;
 

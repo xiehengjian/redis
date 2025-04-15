@@ -272,14 +272,14 @@ int parseExtendedStringArgumentsOrReply(client *c, int *flags, int *unit, robj *
 /* SET key value [NX] [XX] [KEEPTTL] [GET] [EX <seconds>] [PX <milliseconds>]
  *     [EXAT <seconds-timestamp>][PXAT <milliseconds-timestamp>] */
 void setCommand(client *c) {
-    robj *expire = NULL;
-    int unit = UNIT_SECONDS;
-    int flags = OBJ_NO_FLAGS;
+    robj *expire = NULL; // 过期时间
+    int unit = UNIT_SECONDS; // 单位
+    int flags = OBJ_NO_FLAGS; // 标志
 
     if (parseExtendedStringArgumentsOrReply(c,&flags,&unit,&expire,COMMAND_SET) != C_OK) {
         return;
     }
-
+    // 尝试对字符串对象进行编码优化。在 Redis 中，为了节省内存，会尝试将字符串转换为更紧凑的表示形式。
     c->argv[2] = tryObjectEncoding(c->argv[2]);
     setGenericCommand(c,flags,c->argv[1],c->argv[2],expire,unit,NULL,NULL);
 }
